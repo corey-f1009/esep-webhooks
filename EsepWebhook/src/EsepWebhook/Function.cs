@@ -11,20 +11,25 @@ public class Function
 {
    public async Task<APIGatewayProxyResponse> FunctionHandler(APIGatewayProxyRequest input, ILambdaContext context)
 {
+    context.Logger.LogLine($"Incoming payload: {input.Body}");
+
     dynamic deserialize = JsonConvert.DeserializeObject(input.Body);
 
-    string payload = JsonConvert.SerializeObject(new { text = $"Issue Created: {deserialize.issue.html_url}" });
+    string issueUrl = deserialize?.issue?.html_url;
+    context.Logger.LogLine($"Issue URL: {issueUrl}");
 
-    var client = new HttpClient();
+    string payload = JsonConvert.SerializeObject(new { text = $"Issue Created: {issueUrl}" });
 
     var environmentVariable = Environment.GetEnvironmentVariable("SLACK_URL");
+    context.Logger.LogLine($"SLACK_URL: {environmentVariable}");
+
+    using var client = new HttpClient();
     var content = new StringContent(payload, Encoding.UTF8, "application/json");
 
     var response = await client.PostAsync(environmentVariable, content);
-
     var responseBody = await response.Content.ReadAsStringAsync();
 
-    context.Logger.LogLine($"Slack Response: {responseBody}");
+    context.Logger.LogLine($"Slack responded: {response.StatusCode} - {responseBody}");
 
     return new APIGatewayProxyResponse
     {
@@ -33,5 +38,6 @@ public class Function
         Headers = new Dictionary<string, string> { { "Content-Type", "application/json" } }
     };
 }
+
 
 }
