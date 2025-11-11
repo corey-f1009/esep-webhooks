@@ -9,35 +9,29 @@ namespace EsepWebhook;
 
 public class Function
 {
-   public async Task<APIGatewayProxyResponse> FunctionHandler(APIGatewayProxyRequest input, ILambdaContext context)
-{
-    context.Logger.LogLine($"Incoming payload: {input.Body}");
-
-    dynamic deserialize = JsonConvert.DeserializeObject(input.Body);
-
-    string issueUrl = deserialize?.issue?.html_url;
-    context.Logger.LogLine($"Issue URL: {issueUrl}");
-
-    string payload = JsonConvert.SerializeObject(new { text = $"Issue Created: {issueUrl}" });
-
-    var environmentVariable = Environment.GetEnvironmentVariable("SLACK_URL");
-    context.Logger.LogLine($"SLACK_URL: {environmentVariable}");
-
-    using var client = new HttpClient();
-    var content = new StringContent(payload, Encoding.UTF8, "application/json");
-
-    var response = await client.PostAsync(environmentVariable, content);
-    var responseBody = await response.Content.ReadAsStringAsync();
-
-    context.Logger.LogLine($"Slack responded: {response.StatusCode} - {responseBody}");
-
-    return new APIGatewayProxyResponse
+    public APIGatewayProxyResponse FunctionHandler(APIGatewayProxyRequest input, ILambdaContext context)
     {
-        StatusCode = (int)response.StatusCode,
-        Body = responseBody,
-        Headers = new Dictionary<string, string> { { "Content-Type", "application/json" } }
-    };
-}
+        dynamic deserialize = JsonConvert.DeserializeObject(input.Body);
 
+        string payload = JsonConvert.SerializeObject(new { text = $"Issue Created: {deserialize.issue.html_url}" });
 
+        var client = new HttpClient();
+
+        var environmentVariable = Environment.GetEnvironmentVariable("SLACK_URL");
+        var content = new StringContent(payload, Encoding.UTF8, "application/json");
+
+        var response = client.PostAsync(
+            environmentVariable,
+            content
+        ).Result;
+
+        var proxyResponse = new APIGatewayProxyResponse
+        {
+            StatusCode = 200,
+            Body = response.Content.ReadAsStringAsync().Result,
+            Headers = new Dictionary<string, string> { { "Content-Type", "application/json" } }
+        };
+
+        return proxyResponse;
+    }
 }
