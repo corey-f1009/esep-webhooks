@@ -9,29 +9,29 @@ namespace EsepWebhook;
 
 public class Function
 {
-    public APIGatewayProxyResponse FunctionHandler(APIGatewayProxyRequest input, ILambdaContext context)
+   public async Task<APIGatewayProxyResponse> FunctionHandler(APIGatewayProxyRequest input, ILambdaContext context)
+{
+    dynamic deserialize = JsonConvert.DeserializeObject(input.Body);
+
+    string payload = JsonConvert.SerializeObject(new { text = $"Issue Created: {deserialize.issue.html_url}" });
+
+    var client = new HttpClient();
+
+    var environmentVariable = Environment.GetEnvironmentVariable("SLACK_URL");
+    var content = new StringContent(payload, Encoding.UTF8, "application/json");
+
+    var response = await client.PostAsync(environmentVariable, content);
+
+    var responseBody = await response.Content.ReadAsStringAsync();
+
+    context.Logger.LogLine($"Slack Response: {responseBody}");
+
+    return new APIGatewayProxyResponse
     {
-        dynamic deserialize = JsonConvert.DeserializeObject(input.Body);
+        StatusCode = (int)response.StatusCode,
+        Body = responseBody,
+        Headers = new Dictionary<string, string> { { "Content-Type", "application/json" } }
+    };
+}
 
-        string payload = JsonConvert.SerializeObject(new { text = $"Issue Created: {deserialize.issue.html_url}" });
-
-        var client = new HttpClient();
-
-        var environmentVariable = Environment.GetEnvironmentVariable("SLACK_URL");
-        var content = new StringContent(payload, Encoding.UTF8, "application/json");
-
-        var response = client.PostAsync(
-            environmentVariable,
-            content
-        ).Result;
-
-        var proxyResponse = new APIGatewayProxyResponse
-        {
-            StatusCode = 200,
-            Body = response.Content.ReadAsStringAsync().Result,
-            Headers = new Dictionary<string, string> { { "Content-Type", "application/json" } }
-        };
-
-        return proxyResponse;
-    }
 }
